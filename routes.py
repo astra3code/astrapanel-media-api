@@ -1,6 +1,7 @@
 import json
 import time
 import asyncio
+import httpx
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 from fastapi.responses import StreamingResponse
 
@@ -648,11 +649,12 @@ async def proxy_stream(
     if range_header:
         req_headers["Range"] = range_header
 
-    client = state.require_client()
+    client = httpx.AsyncClient(http2=True, follow_redirects=True, timeout=60.0)
     upstream_req = client.build_request("GET", stream_url, headers=req_headers)
     upstream_resp = await client.send(upstream_req, stream=True)
     if upstream_resp.status_code >= 400:
         await upstream_resp.aclose()
+        await client.aclose()
         raise HTTPException(502, detail=f"Upstream stream error: {upstream_resp.status_code}")
 
     async def body_iter():
@@ -661,6 +663,7 @@ async def proxy_stream(
                 yield chunk
         finally:
             await upstream_resp.aclose()
+            await client.aclose()
 
     fwd_headers = {}
     for h in ("content-length", "content-type", "accept-ranges", "content-range", "etag", "last-modified"):
@@ -684,7 +687,6 @@ async def get_subtitles_vtt(subject_id: str, lang: str, detail_path: str, se: in
     srt_url = match.get("url")
     if not srt_url or not srt_url.startswith("https://"):
         raise HTTPException(502, detail="Invalid caption URL")
-    import httpx
     async with httpx.AsyncClient(timeout=30, follow_redirects=True) as c:
         r = await c.get(srt_url)
     if r.status_code != 200:
