@@ -638,7 +638,12 @@ async def proxy_stream(
     if not stream_url:
         raise HTTPException(502, detail="Selected source has no URL")
 
-    req_headers = {**PLAYER_HEADERS, "Referer": stream["referer"]}
+    req_headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+        "Referer": "https://moviebox.ph/",
+        "Accept": "*/*",
+        "Accept-Encoding": "identity",
+    }
     range_header = request.headers.get("range")
     if range_header:
         req_headers["Range"] = range_header
